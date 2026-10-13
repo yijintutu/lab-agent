@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>智能实验室预约系统（课程总纲）</title>
+  </head>
+  <body>
+    <outline text="一、系统简介">
+      <outline text="定位：从真实业务系统出发，逐步接入 AI 能力"/>
+      <outline text="关键认知：不是简单调用一次大模型 API"/>
+      <outline text="最终技术栈">
+        <outline text="前端：Vue3 + Vite + Element Plus"/>
+        <outline text="后端：Python + FastAPI + SQLAlchemy"/>
+        <outline text="数据库：MySQL"/>
+        <outline text="AI：LangChain、ChromaDB、RAG、LangGraph"/>
+      </outline>
+    </outline>
+    <outline text="二、为什么选择这个项目">
+      <outline text="痛点：学了很多技术，却不会组合到真实项目中"/>
+      <outline text="孤立的技能点">
+        <outline text="学 FastAPI → 只会写 CRUD"/>
+        <outline text="学 LangChain → 只会调用大模型"/>
+        <outline text="学 RAG → 只会做知识库问答"/>
+        <outline text="学 LangGraph → 只会画工作流"/>
+      </outline>
+      <outline text="课程目标：用一个完整项目把这些技术串联起来"/>
+    </outline>
+    <outline text="三、项目背景">
+      <outline text="学校拥有多个实验室">
+        <outline text="人工智能实验室"/>
+        <outline text="机器人实验室"/>
+        <outline text="云计算实验室"/>
+        <outline text="软件工程实验室"/>
+      </outline>
+      <outline text="各实验室的差异">
+        <outline text="实验设备不同"/>
+        <outline text="容纳人数不同"/>
+        <outline text="开放时间不同"/>
+        <outline text="使用规则不同"/>
+      </outline>
+      <outline text="传统预约流程">
+        <outline text="查看实验室"/>
+        <outline text="了解实验室设备"/>
+        <outline text="选择预约时间"/>
+        <outline text="提交预约申请"/>
+        <outline text="管理员审核"/>
+      </outline>
+      <outline text="AI 目标：一句话完成查询与预约">
+        <outline text="明天下午要一个能容纳 20 人的实验室"/>
+        <outline text="哪个实验室有 RTX4090"/>
+        <outline text="帮我预约明天下午两点到五点的 AI 实验室"/>
+      </outline>
+    </outline>
+    <outline text="四、项目开发路线（核心主线）">
+      <outline text="总路线：业务系统 → AI 能力 → AI Agent"/>
+      <outline text="第一阶段：实验室预约业务系统">
+        <outline text="学生端功能">
+          <outline text="用户登录"/>
+          <outline text="实验室列表"/>
+          <outline text="实验室详情"/>
+          <outline text="实验室预约"/>
+          <outline text="我的预约"/>
+          <outline text="取消预约"/>
+        </outline>
+        <outline text="管理端功能">
+          <outline text="实验室管理"/>
+          <outline text="设备管理"/>
+          <outline text="预约审核"/>
+          <outline text="用户管理"/>
+        </outline>
+        <outline text="使用技术：Vue3、FastAPI、SQLAlchemy、MySQL"/>
+      </outline>
+      <outline text="第二阶段：接入大模型">
+        <outline text="产物：AI 实验室助手（聊天式咨询）"/>
+        <outline text="典型问题：开放到几点、有哪些设备、如何预约"/>
+        <outline text="学习点：大模型 API、Prompt、Message、AI 对话"/>
+      </outline>
+      <outline text="第三阶段：RAG 实验室知识库">
+        <outline text="解决问题：大模型不知道学校的私有规则"/>
+        <outline text="导入资料">
+          <outline text="实验室预约规则"/>
+          <outline text="实验室安全规范"/>
+          <outline text="设备使用规范"/>
+          <outline text="实验室管理制度"/>
+        </outline>
+        <outline text="工作流程">
+          <outline text="用户问题"/>
+          <outline text="检索相关知识（ChromaDB）"/>
+          <outline text="获取相关文档"/>
+          <outline text="大模型生成回答"/>
+        </outline>
+      </outline>
+      <outline text="第四阶段：Tool Calling（工具调用）">
+        <outline text="解决问题：AI 无法操作实时业务数据"/>
+        <outline text="工作流程">
+          <outline text="用户问题"/>
+          <outline text="AI 判断是否调用工具"/>
+          <outline text="Tool Calling"/>
+          <outline text="查询数据库"/>
+          <outline text="返回真实数据"/>
+          <outline text="AI 生成回答"/>
+        </outline>
+        <outline text="示例工具：search_laboratory()"/>
+        <outline text="学习点：LangChain、Tool、Tool Calling、Structured Output"/>
+      </outline>
+      <outline text="第五阶段：LangGraph 智能预约">
+        <outline text="特征：多步骤、有状态的业务流程"/>
+        <outline text="工作流程">
+          <outline text="用户请求"/>
+          <outline text="提取预约信息"/>
+          <outline text="判断信息是否完整"/>
+          <outline text="不完整 → 继续追问"/>
+          <outline text="完整 → 查询实验室"/>
+          <outline text="查询空闲时间"/>
+          <outline text="推荐实验室方案"/>
+          <outline text="等待用户确认（Human-in-the-loop）"/>
+          <outline text="创建预约"/>
+        </outline>
+        <outline text="学习点：State、Node、Edge、Conditional Edge、ToolNode、Human-in-the-loop"/>
+      </outline>
+    </outline>
+    <outline text="五、完整技术架构">
+      <outline text="前端 Vue3">
+        <outline text="传统业务 API"/>
+        <outline text="AI Chat"/>
+      </outline>
+      <outline text="后端 FastAPI">
+        <outline text="Service（业务服务）"/>
+        <outline text="Tool（AI 工具）"/>
+        <outline text="RAG（知识检索）"/>
+        <outline text="Memory（记忆）"/>
+      </outline>
+      <outline text="数据层">
+        <outline text="MySQL（业务数据）"/>
+        <outline text="ChromaDB（向量知识库）"/>
+      </outline>
+    </outline>
+    <outline text="六、核心思想">
+      <outline text="AI 不是重新开发一套业务系统"/>
+      <outline text="AI 是为原有业务系统增加一个智能入口"/>
+      <outline text="传统链路：点击按钮 → API → 业务系统 → 数据库"/>
+      <outline text="AI 链路：自然语言 → AI Agent → 调用业务工具 → 业务系统 → 数据库"/>
+    </outline>
+    <outline text="七、课程开发顺序（7 个部分）">
+      <outline text="第一部分：Python + FastAPI 基础"/>
+      <outline text="第二部分：实验室预约业务系统"/>
+      <outline text="第三部分：接入大模型"/>
+      <outline text="第四部分：RAG 实验室知识库"/>
+      <outline text="第五部分：Tool Calling"/>
+      <outline text="第六部分：LangGraph"/>
+      <outline text="第七部分：AI 智能预约 Agent"/>
+    </outline>
+    <outline text="八、已落地的前 5 节实操">
+      <outline text="第 1 节：搭建环境、创建前端 Vue 工程">
+        <outline text="安装软件：VSCode、NodeJS"/>
+        <outline text="验证环境：node -v、npm -v"/>
+        <outline text="配置 npm 国内镜像"/>
+        <outline text="VSCode 插件：Vue-Official、Prettier"/>
+        <outline text="创建工程：npm create vue@latest"/>
+        <outline text="Prettier 配置：.prettierrc.json"/>
+        <outline text="保存自动格式化：settings.json"/>
+        <outline text="安装 Element Plus 与图标库"/>
+        <outline text="配置中文国际化 zh-cn"/>
+        <outline text="编写全局样式 global.css"/>
+        <outline text="main.js 中完成总组装"/>
+      </outline>
+      <outline text="第 2 节：搭建前端 Vue 主体框架">
+        <outline text="App.vue 只保留 router-view 作为出口"/>
+        <outline text="Layout 布局">
+          <outline text="el-header 顶部标题栏"/>
+          <outline text="el-aside 左侧菜单"/>
+          <outline text="el-main 主内容区（嵌套 router-view）"/>
+        </outline>
+        <outline text="路由配置：/manager 父路由 + 子路由"/>
+        <outline text="Home.vue 系统首页"/>
+      </outline>
+      <outline text="第 3 节：开发前端登录页面">
+        <outline text="Login.vue">
+          <outline text="el-form 账号密码表单"/>
+          <outline text="输入框图标、按钮 loading"/>
+          <outline text="登录成功后跳转（当前为模拟）"/>
+        </outline>
+        <outline text="Register.vue 注册页"/>
+        <outline text="路由补充 /login、/register"/>
+      </outline>
+      <outline text="第 4 节：搭建后端 FastAPI 工程">
+        <outline text="安装软件：Python、MySQL、Navicat"/>
+        <outline text="配置 pip 阿里云镜像 pip.ini"/>
+        <outline text="创建并激活虚拟环境 .venv"/>
+        <outline text="编写 requirements.txt 并安装依赖"/>
+        <outline text="编写第一个接口 Hello FastAPI"/>
+        <outline text="uvicorn 启动并测试"/>
+      </outline>
+      <outline text="第 5 节：开发后端登录 API">
+        <outline text=".env：配置 DATABASE_URL"/>
+        <outline text="config.py：Settings 自动读取 .env"/>
+        <outline text="database.py">
+          <outline text="engine 数据库引擎"/>
+          <outline text="SessionLocal 会话工厂"/>
+          <outline text="get_db 依赖注入（请求结束自动关闭）"/>
+          <outline text="Base 公共基类（id、create_time、update_time）"/>
+        </outline>
+        <outline text="models/user.py：User 模型映射 users 表"/>
+        <outline text="create_all：按模型自动建表"/>
+        <outline text="schemas">
+          <outline text="LoginRequest：校验入参"/>
+          <outline text="UserResponse：规范出参（from_attributes）"/>
+        </outline>
+        <outline text="api/auth.py：POST /api/auth/login"/>
+        <outline text="main.py：注册路由、启动即建表"/>
+        <outline text="ApiPost 工具测试接口"/>
+      </outline>
+    </outline>
+  </body>
+</opml>

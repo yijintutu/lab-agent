@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 环境与密钥（只忽略 backend 的真实 .env，放行示例文件）
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+
+# 运行产物与日志
+/backend/uploads/
+*.log
+*.log.err
+
+# 前端构建产物（frontend/.gitignore 已覆盖，此处兜底）
+frontend/node_modules/
+frontend/dist/
+
+# IDE / 系统
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
