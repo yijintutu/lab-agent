@@ -77,4 +77,3 @@ def root():  # 定义处理根路径请求的函数，函数名可以自定义
 
 
 # uvicorn app.main:app --reload 终端命令启动服务器
-# 测试 GET 请求：curl http://localhost:8000/
