@@ -52,7 +52,7 @@ def _get_model():
         ) from exc
 
 
-def _message_text(content: Any) -> str:
+def message_text(content: Any) -> str:
     """兼容 LangChain 字符串回复和多模态内容块中的文本块。"""
     if isinstance(content, str):
         return content.strip()
@@ -68,7 +68,9 @@ def _message_text(content: Any) -> str:
     return ""
 
 
-def _provider_error(exc: Exception) -> BusinessException:
+def _provider_error(
+    exc: Exception, *, tool_calling: bool = False
+) -> BusinessException:
     status_code = getattr(exc, "status_code", None)
     status_code = status_code or getattr(getattr(exc, "response", None), "status_code", None)
     error_name = type(exc).__name__.lower()
@@ -77,6 +79,11 @@ def _provider_error(exc: Exception) -> BusinessException:
         return BusinessException(message="大模型请求过于频繁，请稍后重试", code=429)
     if status_code in (401, 403) or "authentication" in error_name or "permission" in error_name:
         return BusinessException(message="大模型密钥无效或无权访问该模型", code=502)
+    if status_code == 400 and tool_calling:
+        return BusinessException(
+            message="大模型拒绝了工具调用请求，请确认当前模型和接口支持 LangChain Tool Calling",
+            code=502,
+        )
     if isinstance(exc, (TimeoutError,)) or "timeout" in error_name:
         return BusinessException(message="大模型响应超时，请稍后重试", code=504)
     if "connection" in error_name or "network" in error_name:
@@ -87,15 +94,36 @@ def _provider_error(exc: Exception) -> BusinessException:
 
 
 class LLMClient:
-    async def chat(self, messages: list[dict[str, str]]) -> str:
+    async def invoke(
+        self,
+        messages: list[Any],
+        *,
+        tools: list[Any] | None = None,
+    ) -> Any:
+        """Return the LangChain message unchanged so callers can inspect tool_calls."""
         try:
-            response = await _get_model().ainvoke(messages)
+            model = _get_model()
+            if tools:
+                try:
+                    model = model.bind_tools(tools)
+                except NotImplementedError as exc:
+                    raise BusinessException(
+                        message="当前 LangChain provider 未实现 Tool Calling，请确认模型和接口支持工具调用",
+                        code=501,
+                    ) from exc
+            return await model.ainvoke(messages)
         except BusinessException:
             raise
         except Exception as exc:
-            raise _provider_error(exc) from exc
+            raise _provider_error(exc, tool_calling=bool(tools)) from exc
 
-        content = _message_text(getattr(response, "content", None))
+    async def chat(self, messages: list[dict[str, str]]) -> str:
+        try:
+            response = await self.invoke(messages)
+        except BusinessException:
+            raise
+
+        content = message_text(getattr(response, "content", None))
         if not content:
             raise BusinessException(message="大模型返回了空内容，请重试", code=502)
         return content
@@ -108,7 +136,7 @@ class LLMClient:
 
         try:
             async for chunk in _get_model().astream(messages):
-                text = _message_text(getattr(chunk, "content", None))
+                text = message_text(getattr(chunk, "content", None))
                 if text:
                     yield text
         except BusinessException:

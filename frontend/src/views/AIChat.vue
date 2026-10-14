@@ -46,7 +46,7 @@
       </el-button>
     </div>
     <div class="hint">
-      回答可参考知识库资料；实验室当前状态、设备维修和预约占用仍需到系统页面查询。Enter 发送，Shift + Enter 换行。
+      实时实验室和设备信息通过后端只读查询；助手不会提交或修改预约。实验室开放标记不代表具体时段有空位。Enter 发送，Shift + Enter 换行。
     </div>
   </el-card>
 </template>
@@ -62,7 +62,7 @@ const { userInfo } = useUser()
 const messages = ref([
   {
     role: 'assistant',
-    content: '您好，我是实验室助手。可以问我预约规则、实验室介绍、开放时间和设备说明。实时状态请查看系统页面。'
+    content: '您好，我是实验室助手。可以问我预约规则、实验室介绍和设备说明，也可以查询当前标记为开放的实验室及某实验室登记的设备。开放标记不代表具体时段有空位。'
   }
 ])
 const history = ref([])
