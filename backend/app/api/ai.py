@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.common.exceptions import BusinessException
 from app.common.response import Response
 from app.database import get_db
 from app.dependencies.auth import get_current_admin, get_current_user
@@ -13,12 +14,14 @@ router = APIRouter(prefix="/ai", tags=["AI 对话"])
 
 @router.post("/chat")
 async def chat(
+    request: Request,
     data: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
-    # current_user 由 JWT 注入；阶段②不持久化会话，也不接受客户端提供身份字段。
-    _ = current_user.id
-    result = await ai_service.chat(data)
+    graph = getattr(request.app.state, "ai_graph", None)
+    if graph is None:
+        raise BusinessException(message="AI 助手当前未启用", code=503)
+    result = await ai_service.chat(graph, current_user, data)
     return Response.success(data=result)
 
 

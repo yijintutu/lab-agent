@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     AI_ENABLED: bool = False
     AI_TOOLS_ENABLED: bool = False
     AI_WRITE_TOOLS_ENABLED: bool = False
+    AI_AGENT_TIMEOUT_SECONDS: float = 180.0
+    AI_CHECKPOINT_DB: Path = BASE_DIR / "data" / "agent_checkpoints.sqlite3"
 
     # AI 接入配置均可缺省，缺少密钥时只影响 AI 请求，不影响阶段①业务启动。
     LLM_API_KEY: str = ""

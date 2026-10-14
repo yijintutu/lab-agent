@@ -3,13 +3,16 @@
     <template #header>
       <div class="card-header">
         <div class="title">AI 智能助手</div>
-        <el-button
-          v-if="userInfo?.role === 'admin'"
-          :loading="rebuilding"
-          @click="handleRebuildIndex"
-        >
-          重建知识库
-        </el-button>
+        <div class="header-actions">
+          <el-button :disabled="loading" @click="startNewConversation">新对话</el-button>
+          <el-button
+            v-if="userInfo?.role === 'admin'"
+            :loading="rebuilding"
+            @click="handleRebuildIndex"
+          >
+            重建知识库
+          </el-button>
+        </div>
       </div>
     </template>
 
@@ -21,6 +24,7 @@
         :class="item.role === 'user' ? 'user-row' : 'assistant-row'"
       >
         <div class="message-bubble" :class="item.role === 'user' ? 'user-bubble' : ''">
+          <div v-if="item.pending_confirmation" class="confirmation-label">预约待确认</div>
           {{ item.content }}
         </div>
         <div v-if="item.sources?.length" class="sources">
@@ -36,7 +40,7 @@
         :rows="2"
         maxlength="8000"
         show-word-limit
-        placeholder="问问实验室预约流程……"
+        placeholder="问问实验室预约规则，或描述预约需求……"
         :disabled="loading"
         @keydown.enter.exact.prevent="handleSend"
         @keydown.enter.shift.stop
@@ -46,7 +50,7 @@
       </el-button>
     </div>
     <div class="hint">
-      实时实验室和设备信息通过后端只读查询；助手不会提交或修改预约。实验室开放标记不代表具体时段有空位。Enter 发送，Shift + Enter 换行。
+      实时状态由后端查询。预约会先核验并展示草案；只有回复“确认预约”才会提交，回复“取消预约”会放弃。提交后仍需管理员审核。Enter 发送，Shift + Enter 换行。
     </div>
   </el-card>
 </template>
@@ -59,13 +63,58 @@ import { useUser } from '@/utils/user'
 
 const { userInfo } = useUser()
 
-const messages = ref([
-  {
+function welcomeMessage() {
+  return {
     role: 'assistant',
-    content: '您好，我是实验室助手。可以问我预约规则、实验室介绍和设备说明，也可以查询当前标记为开放的实验室及某实验室登记的设备。开放标记不代表具体时段有空位。'
+    content:
+      '您好，我是实验室助手。可以问我预约规则、实验室介绍和设备说明，也可以查询当前开放标记及设备状态。预约提交后需要管理员审核。'
   }
-])
-const history = ref([])
+}
+
+const conversationStorageKey = `lab-ai-thread:${userInfo.value?.id ?? 'unknown'}`
+
+function restoreConversation() {
+  try {
+    const raw = sessionStorage.getItem(conversationStorageKey)
+    if (!raw) return null
+    const saved = JSON.parse(raw)
+    if (
+      typeof saved?.threadId === 'string' &&
+      Array.isArray(saved.messages) &&
+      saved.messages.every(
+        (item) =>
+          item &&
+          (item.role === 'user' || item.role === 'assistant') &&
+          typeof item.content === 'string'
+      )
+    ) {
+      return saved
+    }
+  } catch {
+    // Start with a fresh view when session storage contains invalid data.
+  }
+  return null
+}
+
+const restoredConversation = restoreConversation()
+
+function saveConversation() {
+  if (!threadId.value) return
+  try {
+    sessionStorage.setItem(
+      conversationStorageKey,
+      JSON.stringify({ threadId: threadId.value, messages: messages.value })
+    )
+  } catch {
+    // The active chat still works in memory if browser storage is unavailable.
+  }
+}
+
+const messages = ref([welcomeMessage()])
+const threadId = ref(restoredConversation?.threadId || null)
+if (restoredConversation?.messages?.length) {
+  messages.value = restoredConversation.messages
+}
 const input = ref('')
 const loading = ref(false)
 const rebuilding = ref(false)
@@ -75,6 +124,19 @@ function scrollToBottom() {
   nextTick(() => {
     if (listRef.value) listRef.value.scrollTop = listRef.value.scrollHeight
   })
+}
+
+function startNewConversation() {
+  if (loading.value) return
+  threadId.value = null
+  try {
+    sessionStorage.removeItem(conversationStorageKey)
+  } catch {
+    // The in-memory conversation still resets.
+  }
+  messages.value = [welcomeMessage()]
+  input.value = ''
+  scrollToBottom()
 }
 
 async function handleRebuildIndex() {
@@ -100,26 +162,36 @@ async function handleSend() {
   const content = input.value.trim()
   if (!content || loading.value) return
 
-  history.value.push({ role: 'user', content })
-  history.value = history.value.slice(-40)
   messages.value.push({ role: 'user', content })
+  saveConversation()
   input.value = ''
   loading.value = true
   scrollToBottom()
 
   try {
-    const result = await chatApi({ messages: history.value })
+    const result = await chatApi({
+      message: content,
+      thread_id: threadId.value || undefined
+    })
     if (result?.code === 200 && result.data?.role === 'assistant' && result.data.content) {
-      messages.value.push(result.data)
-      history.value.push({ role: result.data.role, content: result.data.content })
-      history.value = history.value.slice(-40)
+      threadId.value = result.data.thread_id
+      messages.value.push({
+        ...result.data,
+        sources: result.data.sources || []
+      })
+      saveConversation()
     } else {
-      const message = result?.message || '助手暂时无法回答，请稍后重试。'
-      messages.value.push({ role: 'assistant', content: message })
+      messages.value.push({
+        role: 'assistant',
+        content: result?.message || '助手暂时无法回答，请稍后重试。'
+      })
+      saveConversation()
     }
   } catch (error) {
-    const message = error?.message || error?.response?.data?.message || '网络异常，请稍后重试。'
+    const message =
+      error?.response?.data?.message || error?.message || '网络异常，请稍后重试。'
     messages.value.push({ role: 'assistant', content: `本次请求失败：${message}` })
+    saveConversation()
   } finally {
     loading.value = false
     scrollToBottom()
@@ -135,10 +207,12 @@ async function handleSend() {
   font-size: 16px;
   font-weight: 600;
 }
-.card-header {
+.card-header,
+.header-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 .message-list {
   height: min(60vh, 560px);
@@ -174,6 +248,12 @@ async function handleSend() {
   background: #409eff;
   color: #fff;
 }
+.confirmation-label {
+  margin-bottom: 6px;
+  color: #b88230;
+  font-size: 12px;
+  font-weight: 600;
+}
 .composer {
   display: flex;
   align-items: flex-end;
@@ -184,6 +264,7 @@ async function handleSend() {
   margin-top: 8px;
   color: #909399;
   font-size: 12px;
+  line-height: 1.6;
 }
 .sources {
   margin: 4px 8px 0;
