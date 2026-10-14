@@ -25,6 +25,20 @@ class ChatRequest(BaseModel):
         return self
 
 
+class ChatSource(BaseModel):
+    source: str
+    kind: Literal["policy", "lab", "equipment", "document"]
+    score: float = Field(ge=0, le=1)
+
+
 class ChatResponse(BaseModel):
     role: Literal["assistant"] = "assistant"
     content: str = Field(min_length=1)
+    sources: list[ChatSource] = Field(default_factory=list)
+
+
+class KnowledgeIndexResponse(BaseModel):
+    collection_name: str
+    document_count: int
+    chunk_count: int
+    indexed_at: str

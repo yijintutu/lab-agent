@@ -8,3 +8,11 @@ export function chatApi(data) {
     timeout: 60000
   })
 }
+
+export function rebuildKnowledgeIndexApi() {
+  return request({
+    url: '/api/ai/kb/rebuild',
+    method: 'post',
+    timeout: 120000
+  })
+}
