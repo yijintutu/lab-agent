@@ -11,6 +11,19 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
 
+    AI_ENABLED: bool = False
+    AI_TOOLS_ENABLED: bool = False
+    AI_WRITE_TOOLS_ENABLED: bool = False
+
+    # AI 接入配置均可缺省，缺少密钥时只影响 AI 请求，不影响阶段①业务启动。
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = ""
+    LLM_MODEL: str = ""
+    LLM_MODEL_PROVIDER: str = ""
+    LLM_TIMEOUT_SECONDS: float = 60.0
+    LLM_TEMPERATURE: float = 0.2
+    LLM_STREAM_ENABLED: bool = False
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env", env_file_encoding="utf-8"
     )

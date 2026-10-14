@@ -55,6 +55,11 @@
               <span>系统首页</span>
             </el-menu-item>
 
+            <el-menu-item index="/manager/ai-chat">
+              <el-icon><ChatDotRound /></el-icon>
+              <span>AI 智能助手</span>
+            </el-menu-item>
+
             <el-menu-item index="/manager/my-reservation" v-if="userInfo?.role === 'student'">
               <el-icon><Tickets /></el-icon>
               <span>我的预约</span>
@@ -99,6 +104,7 @@
 import { useUser } from '@/utils/user'
 import { logout } from '@/utils/auth'
 import router from '@/router'
+import defaultAvatar from '@/assets/imgs/logo.png'
 import {
   Menu as IconMenu,
   House,
@@ -106,7 +112,8 @@ import {
   User,
   OfficeBuilding,
   Tickets,
-  DocumentChecked
+  DocumentChecked,
+  ChatDotRound
 } from '@element-plus/icons-vue'
 
 const { userInfo } = useUser()
