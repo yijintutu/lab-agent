@@ -1,3 +1,7 @@
+import os
+
+os.environ["LANGGRAPH_STRICT_MSGPACK"] = "true"
+
 from fastapi import FastAPI  # 从 FastAPI 框架导入 FastAPI 类，用来创建 Web 应用实例
 from app.models.user import (
     User,
@@ -5,6 +9,7 @@ from app.models.user import (
 from app.models.lab import Lab
 from app.models.equipment import Equipment
 from app.models.reservation import Reservation
+from app.models.reservation_idempotency import ReservationIdempotency
 from app.database import (
     Base,
     engine,
@@ -21,6 +26,9 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import UPLOAD_DIR
+from app.config import settings
+from app.services import ai_service
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 import asyncio
 from app.services import reservation_service
 from contextlib import asynccontextmanager
@@ -35,8 +43,25 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(
         reservation_service.run_expire_scan()
     )  # 启动项目开启异步的扫描任务
-    yield
-    task.cancel()  # 关闭项目同时取消异步任务
+    try:
+        if settings.AI_ENABLED:
+            settings.AI_CHECKPOINT_DB.parent.mkdir(parents=True, exist_ok=True)
+            async with AsyncSqliteSaver.from_conn_string(
+                str(settings.AI_CHECKPOINT_DB)
+            ) as checkpointer:
+                await checkpointer.setup()
+                app.state.ai_graph = ai_service.compile_graph(checkpointer)
+                yield
+        else:
+            app.state.ai_graph = None
+            yield
+    finally:
+        task.cancel()  # 关闭项目同时取消异步任务
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        app.state.ai_graph = None
 
 
 app = FastAPI(lifespan=lifespan)  # 创建 FastAPI 应用实例，后续路由都注册到这个 app 上
