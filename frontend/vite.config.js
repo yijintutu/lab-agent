@@ -18,7 +18,15 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000', // 后端地址
-        changeOrigin: true // 修改请求头中的 Host/Origin 为 target，核心配置
+        changeOrigin: true, // 修改请求头中的 Host/Origin 为 target，核心配置
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache'
+              proxyRes.headers['x-accel-buffering'] = 'no'
+            }
+          })
+        }
         // 不需要 rewrite：后端路由本身就是 /api 开头，转发时保留 /api 前缀
       },
       '/uploads': {
