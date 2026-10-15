@@ -25,7 +25,33 @@
       >
         <div class="message-bubble" :class="item.role === 'user' ? 'user-bubble' : ''">
           <div v-if="item.pending_confirmation" class="confirmation-label">预约待确认</div>
+          <div v-if="item.role === 'assistant' && item.status" class="assistant-status">
+            {{ item.status }}
+          </div>
+          <div
+            v-if="item.role === 'assistant' && item.steps?.length"
+            class="assistant-steps"
+          >
+            <div v-for="(step, stepIndex) in item.steps" :key="stepIndex">· {{ step }}</div>
+          </div>
           {{ item.content }}
+          <div v-if="item.role === 'assistant' && item.pending_confirmation" class="confirmation-actions">
+            <el-button
+              type="primary"
+              size="small"
+              :disabled="loading"
+              @click="sendConfirmation('确认预约')"
+            >
+              确认预约
+            </el-button>
+            <el-button
+              size="small"
+              :disabled="loading"
+              @click="sendConfirmation('取消预约')"
+            >
+              取消预约
+            </el-button>
+          </div>
         </div>
         <div v-if="item.sources?.length" class="sources">
           参考资料：{{ item.sources.map((source) => source.source).join('、') }}
@@ -56,9 +82,9 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { chatApi, rebuildKnowledgeIndexApi } from '@/api/ai'
+import { chatApi, chatStreamApi, rebuildKnowledgeIndexApi } from '@/api/ai'
 import { useUser } from '@/utils/user'
 
 const { userInfo } = useUser()
@@ -162,40 +188,94 @@ async function handleSend() {
   const content = input.value.trim()
   if (!content || loading.value) return
 
+  const pendingMessage = [...messages.value]
+    .reverse()
+    .find((item) => item.role === 'assistant' && item.pending_confirmation)
+  if (pendingMessage) pendingMessage.pending_confirmation = false
+
   messages.value.push({ role: 'user', content })
   saveConversation()
   input.value = ''
   loading.value = true
   scrollToBottom()
 
+  const assistant = reactive({
+    role: 'assistant',
+    content: '',
+    status: '正在思考…',
+    steps: [],
+    sources: []
+  })
+  messages.value.push(assistant)
+
   try {
-    const result = await chatApi({
-      message: content,
-      thread_id: threadId.value || undefined
-    })
-    if (result?.code === 200 && result.data?.role === 'assistant' && result.data.content) {
-      threadId.value = result.data.thread_id
-      messages.value.push({
-        ...result.data,
-        sources: result.data.sources || []
-      })
-      saveConversation()
-    } else {
-      messages.value.push({
-        role: 'assistant',
-        content: result?.message || '助手暂时无法回答，请稍后重试。'
-      })
-      saveConversation()
-    }
+    await chatStreamApi(
+      {
+        message: content,
+        thread_id: threadId.value || undefined
+      },
+      (evt) => {
+        if (evt?.type === 'meta' && evt.thread_id) {
+          threadId.value = evt.thread_id
+          assistant.status = '正在思考…'
+          return
+        }
+        if (evt?.type === 'status') {
+          assistant.status = evt.message || '正在思考…'
+        } else if (evt?.type === 'tool_start') {
+          const label = evt.label || evt.name || '工具'
+          assistant.status = `正在${label}…`
+          assistant.steps.push(`开始：${label}`)
+        } else if (evt?.type === 'tool_end') {
+          const label = evt.label || evt.name || '工具'
+          assistant.status = `${label}完成`
+          if (evt.name === 'prepare_reservation') {
+            assistant.steps.push(`完成：${label}`)
+          } else if (evt.preview) {
+            assistant.steps.push(`完成：${label}：${evt.preview}`)
+          } else {
+            assistant.steps.push(`完成：${label}`)
+          }
+        } else if (evt?.type === 'confirmation') {
+          assistant.status = ''
+          assistant.content = evt.message || '请确认预约草案。'
+          assistant.pending_confirmation = true
+        } else if (evt?.type === 'token') {
+          assistant.content += evt.content || ''
+          assistant.status = ''
+        } else if (evt?.type === 'done') {
+          assistant.status = ''
+        } else if (evt?.type === 'error') {
+          assistant.status = ''
+          if (pendingMessage) pendingMessage.pending_confirmation = true
+          if (!assistant.content) {
+            assistant.content = evt.message || '请求失败'
+          }
+          ElMessage.error(evt.message || '请求失败')
+        }
+        scrollToBottom()
+      }
+    )
   } catch (error) {
-    const message =
-      error?.response?.data?.message || error?.message || '网络异常，请稍后重试。'
-    messages.value.push({ role: 'assistant', content: `本次请求失败：${message}` })
-    saveConversation()
+    const message = error?.message || '网络异常，请稍后重试。'
+    assistant.status = ''
+    if (pendingMessage) pendingMessage.pending_confirmation = true
+    if (!assistant.content) {
+      assistant.content = `本次请求失败：${message}`
+    }
+    ElMessage.error(message)
   } finally {
     loading.value = false
+    assistant.status = ''
+    saveConversation()
     scrollToBottom()
   }
+}
+
+function sendConfirmation(answer) {
+  if (loading.value) return
+  input.value = answer
+  handleSend()
 }
 </script>
 
@@ -248,11 +328,28 @@ async function handleSend() {
   background: #409eff;
   color: #fff;
 }
+.assistant-status {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+.assistant-steps {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #909399;
+}
 .confirmation-label {
   margin-bottom: 6px;
   color: #b88230;
   font-size: 12px;
   font-weight: 600;
+}
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 .composer {
   display: flex;

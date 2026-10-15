@@ -39,6 +39,7 @@ def _get_model():
             timeout=settings.LLM_TIMEOUT_SECONDS,
             max_retries=0,
             temperature=settings.LLM_TEMPERATURE,
+            streaming=True,
         )
     except ImportError as exc:
         raise BusinessException(

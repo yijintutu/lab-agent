@@ -439,6 +439,142 @@ def _snapshot_interrupt_value(snapshot: Any) -> dict | None:
     return None
 
 
+TOOL_LABELS = {
+    "search_lab_docs": "检索实验室知识库",
+    "list_open_labs": "查询开放实验室",
+    "list_lab_equipments": "查询实验室设备",
+    "prepare_reservation": "准备预约草案",
+    "create_lab_reservation": "提交预约",
+    "cancel_reservation": "取消预约",
+    "list_my_reservations": "查询我的预约",
+    "query_lab": "查询实验室",
+    "query_equipment": "查询设备",
+    "get_today": "获取今天日期",
+}
+
+
+def _chunk_text(chunk: Any) -> str:
+    if chunk is None:
+        return ""
+    if isinstance(chunk, dict):
+        content = chunk.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    text_value = part.get("text")
+                    if isinstance(text_value, str):
+                        parts.append(text_value)
+                elif isinstance(part, str):
+                    parts.append(part)
+            return "".join(parts)
+        return str(content) if content is not None else ""
+
+    content = getattr(chunk, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                text_value = part.get("text")
+                if isinstance(text_value, str):
+                    parts.append(text_value)
+            elif isinstance(part, str):
+                parts.append(part)
+        return "".join(parts)
+    return str(content) if content is not None else ""
+
+
+async def stream_chat_events(graph: Any, current_user: User, data: ChatRequest):
+    if not settings.AI_ENABLED:
+        raise BusinessException(message="AI 助手当前未启用", code=503)
+
+    public_thread_id: UUID = data.thread_id or uuid4()
+    graph_thread_id = f"user:{current_user.id}:thread:{public_thread_id}"
+    config = {
+        "configurable": {"thread_id": graph_thread_id},
+        "recursion_limit": 24,
+    }
+
+    snapshot = await graph.aget_state(config)
+    values = getattr(snapshot, "values", {}) or {}
+    stored_user_id = values.get("user_id")
+    if stored_user_id is not None and stored_user_id != current_user.id:
+        raise BusinessException(message="对话线程无效", code=403)
+
+    yield {"type": "meta", "thread_id": str(public_thread_id)}
+    yield {"type": "status", "message": "正在思考…"}
+
+    pending_confirmation = _snapshot_has_interrupt(snapshot)
+    if pending_confirmation:
+        input_payload = Command(resume=data.message)
+    else:
+        input_payload = {
+            "messages": [HumanMessage(content=data.message)],
+            "user_id": current_user.id,
+            "thread_id": str(public_thread_id),
+            "tool_rounds": 0,
+            "final_answer": "",
+        }
+
+    try:
+        async for event in graph.astream_events(
+            input_payload,
+            version="v2",
+            config=config,
+        ):
+            kind = event.get("event")
+            if kind == "on_tool_start":
+                name = event.get("name") or ""
+                yield {
+                    "type": "tool_start",
+                    "name": name,
+                    "label": TOOL_LABELS.get(name, name),
+                }
+            elif kind == "on_tool_end":
+                name = event.get("name") or ""
+                yield {
+                    "type": "tool_end",
+                    "name": name,
+                    "label": TOOL_LABELS.get(name, name),
+                }
+            elif kind == "on_chat_model_stream":
+                metadata = event.get("metadata") or {}
+                if metadata.get("langgraph_node") not in (None, "agent"):
+                    continue
+                text = _chunk_text((event.get("data") or {}).get("chunk"))
+                if text:
+                    yield {"type": "token", "content": text}
+    except BusinessException:
+        raise
+    except Exception as exc:
+        logger.exception("AI stream failed")
+        yield {"type": "error", "message": "大模型调用失败，请稍后重试"}
+        return
+
+    snapshot = await graph.aget_state(config)
+    if _snapshot_has_interrupt(snapshot):
+        values = getattr(snapshot, "values", {}) or {}
+        interrupt_value = _snapshot_interrupt_value(snapshot)
+        draft = values.get("pending_reservation") or (
+            interrupt_value.get("draft") if interrupt_value else None
+        )
+        yield {
+            "type": "confirmation",
+            "message": _confirmation_prompt(draft or {}),
+            "pending_confirmation": True,
+        }
+    elif pending_confirmation:
+        final_answer = (getattr(snapshot, "values", {}) or {}).get("final_answer")
+        if final_answer:
+            yield {"type": "token", "content": final_answer}
+
+    yield {"type": "done"}
+
+
 async def chat(
     graph: Any,
     current_user: User,
